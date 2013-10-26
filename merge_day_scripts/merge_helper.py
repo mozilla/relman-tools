@@ -21,7 +21,7 @@ def file_replace(fname, pat, s_after):
             if not any(re.search(pat, line) for line in f):
                 print pat, "not found in", fname
                 return # pattern does not occur in file so we are done.
-    
+
         with open(fname) as f:
             out_fname = fname + ".tmp"
             out = open(out_fname, "w")
@@ -37,15 +37,15 @@ def file_replace(fname, pat, s_after):
 #=========================================================================================================#
 
 mozilla_central =  "./mozilla-central/"
-mozilla_aurora =    "./mozilla-aurora/"
-mozilla_beta =      "./mozilla-beta/"
+mozilla_aurora =	"./mozilla-aurora/"
+mozilla_beta =		"./mozilla-beta/"
 
-beta_version =      getTemplateValue("https://wiki.mozilla.org/Template:BETA_VERSION")
-aurora_version =    getTemplateValue("https://wiki.mozilla.org/Template:AURORA_VERSION")
-central_version =   getTemplateValue("https://wiki.mozilla.org/Template:CENTRAL_VERSION")
-next_version =      getTemplateValue("https://wiki.mozilla.org/Template:NEXT_VERSION")
+beta_version =		getTemplateValue("https://wiki.mozilla.org/Template:BETA_VERSION")
+aurora_version =	getTemplateValue("https://wiki.mozilla.org/Template:AURORA_VERSION")
+central_version =	getTemplateValue("https://wiki.mozilla.org/Template:CENTRAL_VERSION")
+next_version =		getTemplateValue("https://wiki.mozilla.org/Template:NEXT_VERSION")
 
-weave_version =     str(int(central_version)+2)
+weave_version =		str(int(central_version)+2)
 next_weave_version =    str(int(weave_version)+1)
 
 # mozilla-central
@@ -64,7 +64,7 @@ central_version_files = ["browser/config/version.txt", "config/milestone.txt", "
 for avf in central_version_files:
     file_replace(mozilla_central+avf, central_version+".0a1$", next_version+".0a1")
 
-file_replace(mozilla_central+"xpcom/components/Module.h", central_version+";$", next_version+";") 
+file_replace(mozilla_central+"xpcom/components/Module.h", central_version+";$", next_version+";")
 file_replace(mozilla_central+"services/sync/Makefile.in", "\."+weave_version+"\.", "."+next_weave_version+".")
 
 print("Verify the diff below..")
@@ -82,20 +82,18 @@ raw_input("Tagging mozilla-aurora, hit return to continue")
 mozilla_aurora_tag = "FIREFOX_BETA_"+aurora_version+"_BASE"
 call('hg -R '+ mozilla_aurora +' tag '+ mozilla_aurora_tag  + ' -m "Tagging for mozilla-aurora->mozilla-beta uplift CLOSED TREE DONTBUILD" ', shell=True)
 call('hg out -R '+ mozilla_aurora , shell=True)
-mozilla_beta_rev = subprocess.check_output('hg id -R %s -i -r default' % mozilla_beta, shell=True)
 raw_input("review and push..")
 
 
 raw_input("Tagging mozilla-beta")
 mozilla_beta_tag = "FIREFOX_BETA_"+beta_version+"_END"
 call('hg tag -R '+ mozilla_beta + ' -m "Tagging end of BETA24 CLOSED TREE DONTBUILD" '+ mozilla_beta_tag , shell=True)
-call('hg -R '+ mozilla_beta +' commit --close-branch -m "closing old head CLOSED TREE DONTBUILD"', shell=True)
 call('hg out -R '+ mozilla_beta, shell=True)
+mozilla_beta_rev = subprocess.check_output('hg id -R %s -i -r default' % mozilla_beta, shell=True)
 raw_input("review and push..")
 
 #### Pull from Aurora into Beta ###
 print mozilla_aurora_tag
-#call('hg -R'+ mozilla_beta +' pull -u -r '+ mozilla_aurora_tag +' http://hg.mozilla.org/releases/mozilla-aurora', shell=True)
 call('hg -R'+ mozilla_beta +' pull -r '+ mozilla_aurora_tag +' http://hg.mozilla.org/releases/mozilla-aurora', shell=True)
 call('hg -R'+ mozilla_beta +' up -C', shell=True)
 mozilla_aurora_rev = subprocess.check_output('hg id -R %s -i -r default' % mozilla_beta, shell=True)
@@ -108,7 +106,7 @@ beta_version_files = central_version_files
 
 for avf in beta_version_files:
     file_replace(mozilla_beta+avf, aurora_version+".0a2$", aurora_version+".0")
-    
+
 ### Diff and Commit
 raw_input("Verify the below diff's for version bumps, hit return to commit if everthing looks good ")
 call('hg diff -R'+mozilla_beta, shell=True)
@@ -126,7 +124,7 @@ beta_branding_files = ["debug","l10n-nightly","nightly"]
 for bbd in beta_branding_dirs:
     for bbf in beta_branding_files:
         file_replace(mozilla_beta+bbd+bbf, "ac_add_options --with-branding=mobile/android/branding/aurora", "ac_add_options --with-branding=mobile/android/branding/beta")
-        
+
 
 file_replace(mozilla_beta+"mobile/xul/config/mozconfigs/android/debug", "ac_add_options --with-branding=mobile/xul/branding/aurora", "ac_add_options --with-branding=mobile/xul/branding/beta")
 
@@ -144,20 +142,17 @@ raw_input("continue to the wiki to do the L10n changes+commits and do the final 
 # mozilla-aurora
 print("Tagging mozilla-aurora...")
 mozilla_aurora_old_tag = "FIREFOX_AURORA_"+aurora_version+"_END"
-#call('hg tag -R'+ mozilla_aurora +' -m "Tagging for mozilla-central->mozilla-aurora uplift CLOSED TREE" '+ mozilla_aurora_old_tag , shell=True)
-call('hg -R '+ mozilla_aurora +' commit --close-branch -m "closing old head CLOSED TREE DONTBUILD" ', shell=True)
+call('hg tag -R'+ mozilla_aurora +' -m "Tagging for mozilla-central->mozilla-aurora uplift CLOSED TREE" '+ mozilla_aurora_old_tag , shell=True)
 call('hg out -R'+ mozilla_aurora , shell=True)
 mozilla_aurora_rev = subprocess.check_output('hg id -R %s -i -r default' % mozilla_aurora, shell=True)
 raw_input("Review and do a push of mozilla-aurora")
 raw_input("hit enter to Pull from m-c into Aurora ")
 print mozilla_central_tag
-#call('hg -R '+ mozilla_aurora +' pull -u -r ' + mozilla_central_tag + ' http://hg.mozilla.org/mozilla-central ',shell=True)
 call('hg -R '+ mozilla_aurora +' pull -r ' + mozilla_central_tag + ' http://hg.mozilla.org/mozilla-central ',shell=True)
 call('hg -R'+ mozilla_aurora +' up -C', shell=True)
 mozilla_central_rev = subprocess.check_output('hg id -R %s -i -r default' % mozilla_aurora, shell=True)
 call('hg -R %s hgdebugsetparents %s %s' % (mozilla_aurora, mozilla_central_rev, mozilla_aurora_rev), shell=True)
 call('hg -R %s commit -m "Merging old head via |hg debugsetparents %s %s|. CLOSED TREE DONTBUILD"' % (mozilla_aurora, mozilla_central_rev, mozilla_aurora_rev), shell=True)
-
 raw_input("> version-bump mozilla-aurora (hit 'return' to proceed) <")
 
 ## version bumps
