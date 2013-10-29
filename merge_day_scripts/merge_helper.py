@@ -53,7 +53,7 @@ call('hg pull -R '+ mozilla_central, shell=True)
 call('hg up -R '+mozilla_central, shell=True)
 mozilla_central_tag = "FIREFOX_AURORA_"+central_version+"_BASE"
 print mozilla_central_tag
-call('hg -R ' + mozilla_central + ' tag ' + mozilla_central_tag , shell=True)
+call('hg -R ' + mozilla_central + ' tag ' + mozilla_central_tag + '-m "Tagging for mozilla-central version bumps CLOSED TREE DONTBUILD" ', shell=True)
 raw_input("Latest mozilla-central has been pulled, updated and tagged...")
 raw_input("> version-bump mozilla-central (hit 'return' to proceed) <")
 
@@ -144,7 +144,7 @@ raw_input("*** Continue to the wiki to do the L10n changes+commits and do the fi
 # mozilla-aurora
 print("Tagging mozilla-aurora...")
 mozilla_aurora_old_tag = "FIREFOX_AURORA_"+aurora_version+"_END"
-call('hg tag -R'+ mozilla_aurora +' -m "Tagging for mozilla-central->mozilla-aurora uplift CLOSED TREE" '+ mozilla_aurora_old_tag , shell=True)
+call('hg tag -R'+ mozilla_aurora +' -m "Tagging for mozilla-central->mozilla-aurora uplift CLOSED TREE DONTBUILD" '+ mozilla_aurora_old_tag , shell=True)
 call('hg out -R'+ mozilla_aurora , shell=True)
 mozilla_aurora_rev = subprocess.check_output('hg id -R %s -i -r default' % mozilla_aurora, shell=True)
 raw_input("Review tagging and do a push of mozilla-aurora, then hit return to continue")
