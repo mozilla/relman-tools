@@ -42,7 +42,7 @@ def get_user_input():
     #Reading Version number
     version = raw_input("Enter the current Release Version ( eg : 24.0 , including a chemspill version if exists) \n")
     print "you entered ", version
-    hg_user = raw_input("Enter the mercurial user name in the form username <email@mozilla.com> you will use to commit changes\n")
+    hg_user = raw_input("Enter the mercurial user name in the form \"username <email@mozilla.com>\" you will use to commit changes\n")
     print "the username you entered is", hg_user
     return version,hg_user
 
@@ -69,7 +69,7 @@ def commit_repo(repo, user, old_head, new_head):
         print " Commiting mozilla repo " + repo
         # "Merge" the old head, rather than closing it, to avoid
         # non-fastforward issues in vcs-sync
-        call('hg -R %s hgdebugsetparents %s %s' % (repo, new_head, old_head))
+        call('hg -R %s debugsetparents %s %s' % (repo, new_head, old_head))
         call('hg -R %s commit -m "Merging old head via |hg debugsetparents %s %s|. CLOSED TREE a=release" -u %s' % (repo, new_head, old_head, user), shell=True)
     except:
         print "commit_repo: Unexpected error"
