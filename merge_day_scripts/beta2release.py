@@ -5,11 +5,19 @@
 import urllib2
 import os
 import re
-import sys
 import subprocess
 from subprocess import call
 import datetime
 import time
+
+def run(cmd):
+    try:
+        print "Run Command: "
+        call('echo ' + cmd, shell=True)
+        call(cmd, shell=True)
+    except:
+        print "Unexpected error: cmd = |%s|" % cmd
+        raise
 
 def getTemplateValue(url):
     version_regex = re.compile(".*<p>(.*)</p>.*")
@@ -57,38 +65,31 @@ def get_rev(repo):
 
 def tag_repo(repo, tag, rev, user):
     cmd = 'hg tag -R ' + repo  + ' -r ' + rev + ' -u ' + user + ' -m ' +'" Added tag ' + tag + ' for changeset CLOSED TREE a=release " ' + tag
-    print "Executing tag: ", cmd
-    try:
-        call(cmd, shell=True)
-    except:
-        print "tag_repo: Unexpected error"
-        raise
+    run(cmd)
 
 def commit_repo(repo, user, old_head, new_head):
-    try:
-        print " Commiting mozilla repo " + repo
-        # "Merge" the old head, rather than closing it, to avoid
-        # non-fastforward issues in vcs-sync
-        call('hg -R %s debugsetparents %s %s' % (repo, new_head, old_head))
-        call('hg -R %s commit -m "Merging old head via |hg debugsetparents %s %s|. CLOSED TREE a=release" -u %s' % (repo, new_head, old_head, user), shell=True)
-    except:
-        print "commit_repo: Unexpected error"
-        raise
+    print " Commiting mozilla repo " + repo
+    # "Merge" the old head, rather than closing it, to avoid
+    # non-fastforward issues in vcs-sync
+    cmd = 'hg -R %s debugsetparents %s %s' % (repo, new_head, old_head)
+    run(cmd)
+    cmd = 'hg -R %s commit -m "Merging old head via |hg debugsetparents %s %s|. CLOSED TREE a=release" -u %s' % (repo, new_head, old_head, user)
+    run(cmd)
 
 def pull_up_repo(repo_beta, repo_release):
-    try:
-        print "pulling all changes from mozilla-beta into into mozilla-release\n"
-        call('hg -R ' + repo_release  + ' pull ' + repo_beta, shell=True)
-        print "updating mozilla-release\n"
-        call('hg -R '+ repo_release + ' up -C default', shell=True)
-    except:
-        print "pull_up_repo: Unexpected error"
-        raise
+    print "pulling all changes from mozilla-beta into into mozilla-release\n"
+    cmd = 'hg -R ' + repo_release  + ' pull ' + repo_beta
+    run(cmd)
+    print "updating mozilla-release\n"
+    cmd = 'hg -R '+ repo_release + ' up -C default'
+    run(cmd)
 
 def main():
     #Clone Repos
-    call('hg clone http://hg.mozilla.org/releases/mozilla-release', shell=True)
-    call('hg clone http://hg.mozilla.org/releases/mozilla-beta', shell=True)
+    cmd = 'hg clone http://hg.mozilla.org/releases/mozilla-release'
+    run(cmd)
+    cmd = 'hg clone http://hg.mozilla.org/releases/mozilla-beta'
+    run(cmd)
     mozilla_release = "./mozilla-release/"
     mozilla_beta = "./mozilla-beta/"
 
@@ -109,6 +110,7 @@ def main():
     release_tag = "FIREFOX_RELEASE_" + version
 
     #Tagging
+    print "RUNNING: tag_repo(%s, %s, %s, %s)" % (mozilla_beta, release_base_tag, beta_rev, hg_user)
     tag_repo(mozilla_beta, release_base_tag, beta_rev, hg_user)
     print "You have finished tagging mozilla-beta, now go ahead and push the mozilla-beta repo\n"
     time.sleep(30)
@@ -116,12 +118,17 @@ def main():
     if  user_input1.lower() != "yes" :
         print "Exiting now\n"
         return
+    print "RUNNING: tag_repo(%s, %s, %s, %s)" % (mozilla_beta, release_base_tag, beta_rev, hg_user)
     tag_repo(mozilla_release, release_tag, release_rev, hg_user)
 
     #Commit,pull and update
     mozilla_release_revision = get_rev(mozilla_release)
+    print "MOZILLA_RELEASE_REVISION = " + mozilla_release_revision
     mozilla_beta_revision = get_rev(mozilla_beta)
+    print "MOZILLA_BETA_REVISION = " + mozilla_beta_revision
+    print "RUNNING: pull_up_repo(%s, %s)" % (mozilla_beta, mozilla_release)
     pull_up_repo(mozilla_beta, mozilla_release)
+    print "RUNNING: commit_repo(%s, %s, %s, %s)" % (mozilla_release, hg_user, mozilla_release_revision, mozilla_beta_revision)
     commit_repo(mozilla_release, hg_user, mozilla_release_revision, mozilla_beta_revision)
 
 
@@ -148,9 +155,11 @@ def main():
     print("Now, go edit any mozilla-release/browser/locales/shipped-locales file if you need to remove some beta locales (eg: mn, sw)")
     time.sleep(10)
     raw_input("Hit 'return' to continue to diff's ...")
-    call('hg diff -R '+ mozilla_release , shell=True)
+    cmd = 'hg diff -R '+ mozilla_release
+    run(cmd)
     raw_input("if the diff looks good hit return to continue to commit")
-    call('hg commit -R '+ mozilla_release + ' -u ' + hg_user +' -m "Updating configs CLOSED TREE a=release ba=release"', shell=True)
+    cmd = 'hg commit -R '+ mozilla_release + ' -u ' + hg_user +' -m "Updating configs CLOSED TREE a=release ba=release"'
+    run(cmd)
 
     raw_input("Go ahead and push mozilla-release changes and you are done.")
 
