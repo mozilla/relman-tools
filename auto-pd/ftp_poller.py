@@ -1,3 +1,12 @@
+#!/usr/bin/env python
+"""
+
+A script for automated polling of ftp releases and updating product-details
+as well as the mozilla.com svn externals that rely on a product-details revision
+to populate our download buttons on release channel web pages
+
+"""
+
 import ftplib
 import socket
 import sys
@@ -7,6 +16,7 @@ import os
 import re
 import json
 import smtplib
+from argparse import ArgumentParser
 
 # To run this you need to have checked out in your HOME dir:
 # svn co svn+ssh://'youremail'@svn.mozilla.org/libs/product-details product-details
@@ -18,6 +28,16 @@ import smtplib
 # eg:   firefox.beta.prev contains 24.0b9
 #       mobile.beta.prev contains 24.0b4
 #       firefox.esr.prev contains 17.0.8esr
+
+# BUGS BUGS BUGS BUGS BUGS BUGS BUGS
+# NEED TESTS - this doesn't handle dot releases or ESR version bumped well
+# trim off 'esr' when searching firefoxDetails
+# check that the current version is not already in history/{firefox, mobile} file
+# currently finds 25.0 both in main releases AND in dot releases, so duplicates info
+# also on dot releases, the 'replace' in Details file ends up as 25.0.1.1 which is probably
+# because of replacing just 25.0 and it contains 25.0.1 so we end up with 25.0.1.1
+# why does it think mobile 26.0b4 > 26.0b4?
+# bug: dot releases means history line for a new GA release goes in the wrong section of history
 
 HOME = os.environ['HOME']
 HOST = 'ftp.mozilla.org'
@@ -61,7 +81,17 @@ def run(cmd):
     p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
     return p.stdout.read()
 
-def sendMail(toaddr, options):
+def validate_month(m):
+    m1 = strptime(m, "%b")
+    m2 = strptime(ctime().split()[1], "%b")
+    print strftime("%m", m1)
+    print strftime("%m", m2)
+    if strftime("%m", m1) == strftime("%m", m2):
+        return True
+    else:
+        return False
+
+def send_mail(toaddr, options):
     message = ("From: %s\r\n" % options['username']
         + "To: %s\r\n" % toaddr
         + "CC: %s\r\n" % options['cclist']
@@ -119,6 +149,20 @@ def file_addline(fname, pat, additional_line):
         return
 
 def main():
+    parser = ArgumentParser(__doc__)
+    parser.set_defaults(
+        products = [],
+    )
+    parser.add_argument("-p", "--product", dest="product", action="append",
+            help="a product directory in ftp and also in the product-details")
+    parser.add_argument("-d", "--dryrun", dest="dryrun", action="store_true",
+            help="test the ftp results without updating the product-details or making commits to repos")
+
+    options, args = parser.parse_known_args()
+
+    if options.products == []:
+        options.products = PRODUCTS
+
     working_dir = os.getcwd() + "/"
 
     # move to the releases dir for each product
@@ -126,6 +170,7 @@ def main():
         try:
             # Open ftplib connection
             ftp = ftplib.FTP(HOST)
+            #ftp.login()
         except (socket.error, socket.gaierror):
             print 'cannot reach %s' % HOST
             sys.exit(1)
@@ -142,22 +187,23 @@ def main():
         channels = CHANNELS.copy()
         print "\n===========  %s Output ============\n" % product.capitalize()
         ftp_path = PATH % product
+        # might need a try/catch here for incorrect product input from users
         ftp.cwd(ftp_path)
         # get the dates from the files
         data = []
-        ftp.dir(data.append)
+        ftp.retrlines('LIST', data.append)
         datelist = []
         dirlist = []
         for line in data:
             # split the file info
             col = line.split()
-            # TODO - touch file, only look at newer than last
-            # cast aside anything that doesn't start with a digit
-            # workaround for funnelcake builds too
+            # TODO - touch file, only look at newer than last, cast aside anything that doesn't start with a digit
+            print col
             if col[8][0].isdigit() and "funnelcake" not in col[8]:
                 if ':' in col[7]:
-                    d = [ctime().split()[-1],]
-                    datestr = '-'.join(line.split()[5:7] + d)
+                    if validate_month(col[5]) == True:
+                        d = [ctime().split()[-1],]
+                        datestr = '-'.join(line.split()[5:7] + d)
                 else:
                     datestr = '-'.join(line.split()[5:8])
                 date = strptime(datestr, '%b-%d-%Y')
@@ -167,7 +213,7 @@ def main():
         combo = zip(datelist, dirlist)
         dated_dirnames = dict(combo)
 
-        ### find the most current
+        ### find the most current -- BUG: this no longer works in 2014, why?
         for key in sorted(dated_dirnames.iterkeys(), reverse=False):
             if 'b' in dated_dirnames[key]:
                 channels['beta']['current'] = dated_dirnames[key]
@@ -178,6 +224,7 @@ def main():
             if 'b' not in dated_dirnames[key] and 'esr' not in dated_dirnames[key]:
                 channels['release']['current'] = dated_dirnames[key]
                 channels['release']['release_date'] = strftime('%Y-%m-%d', key)
+        print channels
 
         # Open the prev_version files -- TODO if no file, abort & send message saying it's missing
         for c in channels.keys():
@@ -197,8 +244,10 @@ def main():
                     if int(v[0].strip('.0')) == int(vp[0].strip('.0')):
                         if int(v[1]) > int(vp[1]):
                             channels[c]['update'] = True
+                            print "the %d > %d" % (int(v[1]), int(vp[1]))
                     elif int(v[0].strip('.0')) > int(vp[0].strip('.0')):
                         channels[c]['update'] = True
+                        print "the %d > %d" % (int(v[0].strip('.0')), int(vp[0].strip('.0')))
                 if channels[c]['update'] == True:
                     print "Update %s! %s > %s" % (c, channels[c]['current'], channels[c]['prev'])
                 else:
@@ -209,10 +258,20 @@ def main():
                     channels[c]['update'] = True
                     print "Update %s! %s > %s" % (c, channels[c]['current'], channels[c]['prev'])
                 else:
-                     print "No update for %s" % c        
-            elif channels[c]['prev'] is not '' and channels[c]['current'] > channels[c]['prev']:
-                channels[c]['update'] = True
-                print "Update %s! %s > %s" % (c, channels[c]['current'], channels[c]['prev'])
+                     print "No update for %s" % c    
+            # Checking here for a dot release
+            elif c == 'release':
+                pr = int(len(channels[c]['prev'].split('.')))
+                cu = int(len(channels[c]['current'].split('.')))
+                if cu == 3 and pr == 2:
+                    print "DEBUG: We have a dot release, right? cur: %d prev: %d" % (cu, pr)
+                    channels[c]['update'] = True
+                    print "Update %s! %s > %s" % (c, channels[c]['current'], channels[c]['prev']) 
+                else:
+                    print "Not dealing with a dot release, carry on"     
+                    if channels[c]['prev'] is not '' and channels[c]['current'] > channels[c]['prev']:
+                        channels[c]['update'] = True
+                        print "Update %s! %s > %s" % (c, channels[c]['current'], channels[c]['prev'])
             else:
                 print "No update for %s" % c
 
@@ -310,9 +369,7 @@ def main():
 
         for email in toaddrs:
             print "Sending mail to %s" % email
-            sendMail(email, options)
-
-        ftp.quit()
+            send_mail(email, options)
 
 if __name__ == '__main__':
     main()
