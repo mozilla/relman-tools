@@ -16,7 +16,13 @@ import os
 import re
 import json
 import smtplib
+from copy import deepcopy
 from argparse import ArgumentParser
+
+# put a local_config.py file in your working dir with the following:
+# TOADDRS = ['email@email.com',]
+# REPLY_TO_EMAIL = 'email@email.com'
+from local_config import *
 
 # To run this you need to have checked out in your HOME dir:
 # svn co svn+ssh://'youremail'@svn.mozilla.org/libs/product-details product-details
@@ -27,16 +33,16 @@ from argparse import ArgumentParser
 # for each version and current release number:
 # eg:   firefox.beta.prev contains 24.0b9
 #       mobile.beta.prev contains 24.0b4
-#       firefox.esr.prev contains 17.0.8esr
+#       firefox.esr.prev contains 24.2.0esr
+#       firefox.release.prev contains 26.0.1
 
 # BUGS BUGS BUGS BUGS BUGS BUGS BUGS
-# NEED TESTS - this doesn't handle dot releases or ESR version bumped well
+# NEED TESTS - this doesn't handle ESR version bumped well
 # trim off 'esr' when searching firefoxDetails
 # check that the current version is not already in history/{firefox, mobile} file
 # currently finds 25.0 both in main releases AND in dot releases, so duplicates info
 # also on dot releases, the 'replace' in Details file ends up as 25.0.1.1 which is probably
 # because of replacing just 25.0 and it contains 25.0.1 so we end up with 25.0.1.1
-# why does it think mobile 26.0b4 > 26.0b4?
 # bug: dot releases means history line for a new GA release goes in the wrong section of history
 
 HOME = os.environ['HOME']
@@ -59,8 +65,6 @@ CHANNELS = {
         'release_date': '',
         'update' : False
     },
-    # TODO: Grab highest number with ESR and then the second highest
-    # so we can accomodate 2 versions at once when needed (up to 3)
     'esr' : {
         'prev': '',
         'current': '',
@@ -70,12 +74,12 @@ CHANNELS = {
 }
 
 # Email settings
-REPLY_TO_EMAIL = 'release-mgmt@mozilla.com'
+REPLY_TO_EMAIL = REPLY_TO_EMAIL
 SMTP = 'smtp.mozilla.org'
 CONFIG_JSON = BZ_TOOLS + "/scripts/configs/config.json"
 config = json.load(open(CONFIG_JSON, 'r'))
 subject = None
-toaddrs = ['lsblakk@mozilla.com',]
+toaddrs = TOADDRS
 
 def run(cmd):
     p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
@@ -84,8 +88,6 @@ def run(cmd):
 def validate_month(m):
     m1 = strptime(m, "%b")
     m2 = strptime(ctime().split()[1], "%b")
-    print strftime("%m", m1)
-    print strftime("%m", m2)
     if strftime("%m", m1) == strftime("%m", m2):
         return True
     else:
@@ -184,7 +186,7 @@ def main():
 
         print "Success! Logged on to the FTP server"
 
-        channels = CHANNELS.copy()
+        channels = deepcopy(CHANNELS)
         print "\n===========  %s Output ============\n" % product.capitalize()
         ftp_path = PATH % product
         # might need a try/catch here for incorrect product input from users
@@ -197,8 +199,7 @@ def main():
         for line in data:
             # split the file info
             col = line.split()
-            # TODO - touch file, only look at newer than last, cast aside anything that doesn't start with a digit
-            print col
+            # print "DEBUG col[8]: %s" % col[8]
             if col[8][0].isdigit() and "funnelcake" not in col[8]:
                 if ':' in col[7]:
                     if validate_month(col[5]) == True:
@@ -213,18 +214,19 @@ def main():
         combo = zip(datelist, dirlist)
         dated_dirnames = dict(combo)
 
-        ### find the most current -- BUG: this no longer works in 2014, why?
+        ### find the most current
         for key in sorted(dated_dirnames.iterkeys(), reverse=False):
+            #print "DEBUG: Running: %s" % dated_dirnames[key]
             if 'b' in dated_dirnames[key]:
                 channels['beta']['current'] = dated_dirnames[key]
                 channels['beta']['release_date'] = strftime('%Y-%m-%d', key)
             if product == 'firefox' and 'esr' in dated_dirnames[key]:
+                #print "DEBUG: %s" % dated_dirnames[key]
                 channels['esr']['current'] = dated_dirnames[key]
                 channels['esr']['release_date'] = strftime('%Y-%m-%d', key)
             if 'b' not in dated_dirnames[key] and 'esr' not in dated_dirnames[key]:
                 channels['release']['current'] = dated_dirnames[key]
                 channels['release']['release_date'] = strftime('%Y-%m-%d', key)
-        print channels
 
         # Open the prev_version files -- TODO if no file, abort & send message saying it's missing
         for c in channels.keys():
@@ -254,7 +256,7 @@ def main():
                      print "No update for %s" % c
             ## workaround for esr
             elif c == 'esr':
-                if channels[c]['prev'] is not '' and int(channels[c]['current'].split('.')[-1].strip('esr')) > int(channels[c]['prev'].split('.')[-1].strip('esr')):
+                if channels[c]['prev'] is not '' and int(channels[c]['current'].split('.')[1]) > int(channels[c]['prev'].split('.')[1]):
                     channels[c]['update'] = True
                     print "Update %s! %s > %s" % (c, channels[c]['current'], channels[c]['prev'])
                 else:
@@ -264,7 +266,7 @@ def main():
                 pr = int(len(channels[c]['prev'].split('.')))
                 cu = int(len(channels[c]['current'].split('.')))
                 if cu == 3 and pr == 2:
-                    print "DEBUG: We have a dot release, right? cur: %d prev: %d" % (cu, pr)
+                    #print "DEBUG: We have a dot release, right? cur: %d prev: %d" % (cu, pr)
                     channels[c]['update'] = True
                     print "Update %s! %s > %s" % (c, channels[c]['current'], channels[c]['prev']) 
                 else:
