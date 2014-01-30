@@ -8,9 +8,10 @@ import os
 import json
 import smtplib
 
+HOME = os.environ['HOME']
 REPLY_TO_EMAIL = 'release-mgmt@mozilla.com'
 SMTP = 'smtp.mozilla.org'
-CONFIG_JSON = os.getcwd() + "/bztools/scripts/configs/config.json"
+CONFIG_JSON = "%s/bztools/scripts/configs/config.json" % HOME
 config = json.load(open(CONFIG_JSON, 'r'))
 scripts_dir = os.getcwd() + "/scripts/"
 
@@ -49,18 +50,18 @@ today = datetime.date.today()
 release = datetime.datetime.strptime(release_date, "%B %d, %Y").date()
 
 # Check the timedelta between today and releasedate and if:
-# -7 days before release date Sign Off reminder for 'tomorrow': Wed at 10am PT
-# -29 days before next release date send Post-Mortem for the previous version 'tomorrow': Tues at 9am PT)
+# -6 days before release date Sign Off reminder for 'tomorrow': Thurs at 2pm PT
+# -29 days before next release date send Post-Mortem for the previous version 'tomorrow': Tues at 10am PT)
 timedelta = today - release
 
-if timedelta.days == -7:
+if timedelta.days == -6:
     # send the reminder email for sign off meeting
     print "Sending Sign-off email reminder %s" % today
     subject = "Automatic Reminder: Firefox %s Sign Off Meeting" % beta_version
     body = """
-This is a reminder that the FF%s sign-off meeting will be held tomorrow in the Release Coordination Vidyo room @ 10:00 am PT.
+This is a reminder that the FF%s sign-off meeting will be held tomorrow in the Release Coordination Vidyo room during the Channel Meeting @ 2:00 pm PT.
 
-The wiki page is up and ready for you to add notes : https://wiki.mozilla.org/Releases/Firefox_%s/Final_Signoffs
+The wiki page for notes : https://wiki.mozilla.org/Releases/Firefox_%s/Final_Signoffs
 
 -- Release Management
 """ % (beta_version, beta_version)
@@ -69,7 +70,7 @@ if timedelta.days == -29:
     print "Sending post-mortem email reminder %s" % today
     subject = "Reminder: Firefox %s Post Mortem Meeting Tomorrow" % current_version
     body = """
-Friendly Reminder that the FF%s.0 Post-Mortem will take place tomorrow @ 9:00 am PT in the Release Co-ordination Vidyo room.
+Friendly Reminder that the FF%s.0 Post-Mortem will take place tomorrow @ 10:00 am PT during the Channel Meeting in the Release Co-ordination Vidyo room.
 
 Etherpad - https://etherpad.mozilla.org/%s-0-Post-Mortem
 
