@@ -16,7 +16,7 @@ config = json.load(open(CONFIG_JSON, 'r'))
 scripts_dir = os.getcwd() + "/scripts/"
 
 subject = None
-toaddrs = ['dev-planning@lists.mozilla.org', 'release-drivers@mozilla.com']
+toaddrs = ['dev-planning@lists.mozilla.org', 'release-drivers@mozilla.org']
 
 
 def sendMail(toaddr, options):
