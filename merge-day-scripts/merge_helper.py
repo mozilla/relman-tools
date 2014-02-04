@@ -69,7 +69,7 @@ file_replace(mozilla_central+"services/sync/Makefile.in", "\."+weave_version+"\.
 print("Verify the diff below..")
 call('hg diff -R '+ mozilla_central , shell=True)
 raw_input("if the diff looks good hit return to continue to commit")
-call('hg -R '+ mozilla_central +' commit -m \"Merging in version bump NO BUG\"',shell=True)
+call('hg -R '+ mozilla_central +' commit -m \"Merging in version bump NO BUG CLOSED TREE DONTBUILD\"',shell=True)
 call('hg out -R'+ mozilla_central , shell=True)
 raw_input("Go ahead and push mozilla-central...and continue to mozilla-aurora to mozilla-beta uplift ")
 
@@ -77,27 +77,30 @@ raw_input("Go ahead and push mozilla-central...and continue to mozilla-aurora to
 
 # mozilla-beta
 ##tag mozilla-aurora, close & tag mozilla-beta
+call('hg pull -R '+ mozilla_aurora, shell=True)
+call('hg up -R ' + mozilla_aurora, shell=True)
 raw_input("Tagging mozilla-aurora, hit return to continue")
 mozilla_aurora_tag = "FIREFOX_BETA_"+aurora_version+"_BASE"
-call('hg -R '+ mozilla_aurora +' tag '+ mozilla_aurora_tag  + ' -m "Tagging for mozilla-aurora->mozilla-beta uplift CLOSED TREE DONTBUILD" ', shell=True)
+call('hg -R '+ mozilla_aurora +' tag '+ mozilla_aurora_tag  + ' -m "Tagging for mozilla-aurora->mozilla-beta uplift CLOSED TREE DONTBUILD NO BUG" ', shell=True)
 call('hg out -R '+ mozilla_aurora , shell=True)
 raw_input("review and push..")
 
-
-raw_input("Tagging mozilla-beta")
+call('hg pull -R '+ mozilla_beta, shell=True)
+call('hg up -R ' + mozilla_beta, shell=True)
+raw_input("Tagging mozilla-beta, hit return to continue")
 mozilla_beta_tag = "FIREFOX_BETA_"+beta_version+"_END"
-call('hg tag -R '+ mozilla_beta + ' -m "Tagging end of BETA'+beta_version+' CLOSED TREE DONTBUILD" '+ mozilla_beta_tag , shell=True)
+call('hg tag -R '+ mozilla_beta + ' -m "Tagging end of  ' + beta_version + ' CLOSED TREE DONTBUILD NO BUG" ' + mozilla_beta_tag , shell=True)
 call('hg out -R '+ mozilla_beta, shell=True)
 mozilla_beta_rev = subprocess.check_output('hg id -R %s -i -r default' % mozilla_beta, shell=True)
 raw_input("review and push..")
 
-#### Pull from Aurora into Beta ###
+### Pull from Aurora into Beta ###
 print mozilla_aurora_tag
 call('hg -R'+ mozilla_beta +' pull -r '+ mozilla_aurora_tag +' http://hg.mozilla.org/releases/mozilla-aurora', shell=True)
 call('hg -R'+ mozilla_beta +' up -C', shell=True)
 mozilla_aurora_rev = subprocess.check_output('hg id -R %s -i -r default' % mozilla_beta, shell=True)
-call('hg -R %s debugsetparents %s %s' % (mozilla_beta, mozilla_aurora_rev, mozilla_beta_rev), shell=True)
-call('hg -R %s commit -m "Merging old head via |hg debugsetparents %s %s|. CLOSED TREE DONTBUILD"' % (mozilla_beta, mozilla_aurora_rev, mozilla_beta_rev), shell=True)
+call('hg -R %s debugsetparents %s %s' % (mozilla_beta, mozilla_aurora_rev.rstrip(), mozilla_beta_rev.rstrip()), shell=True)
+call('hg -R %s commit -m "Merging old head via |hg debugsetparents %s %s|. CLOSED TREE DONTBUILD NO BUG"' % (mozilla_beta, mozilla_aurora_rev.rstrip(), mozilla_beta_rev.rstrip()), shell=True)
 raw_input("> you have finished pulling aurora into mozilla_beta (hit 'return' to proceed to next step : version bump) <")
 
 ## version bump
@@ -139,12 +142,12 @@ raw_input("> hit return to commit if everthing looks good <")
 call('hg -R '+ mozilla_beta +' commit -m "Merging in branding changes NO BUG CLOSED TREE ba=release"',shell=True)
 
 
-raw_input("*** Continue to the wiki to do the L10n changes+commits and do the final push of mozilla-beta ***\nReturn when done & hit return to continue.")
+raw_input("*** Go do the CLOBBER and the final push of mozilla-beta ***\nReturn when done & hit return to continue.")
 
 # mozilla-aurora
 print("Tagging mozilla-aurora...")
-mozilla_aurora_old_tag = "FIREFOX_AURORA_"+aurora_version+"_END"
-call('hg tag -R'+ mozilla_aurora +' -m "Tagging for mozilla-central->mozilla-aurora uplift CLOSED TREE DONTBUILD" '+ mozilla_aurora_old_tag , shell=True)
+mozilla_aurora_old_tag = "FIREFOX_AURORA_" + beta_version + "_END"
+call('hg tag -R'+ mozilla_aurora +' -m "Tagging for mozilla-central->mozilla-aurora uplift CLOSED TREE DONTBUILD NO BUG" '+ mozilla_aurora_old_tag , shell=True)
 call('hg out -R'+ mozilla_aurora , shell=True)
 mozilla_aurora_rev = subprocess.check_output('hg id -R %s -i -r default' % mozilla_aurora, shell=True)
 raw_input("Review tagging and do a push of mozilla-aurora, then hit return to continue")
@@ -153,8 +156,8 @@ print mozilla_central_tag
 call('hg -R '+ mozilla_aurora +' pull -r ' + mozilla_central_tag + ' http://hg.mozilla.org/mozilla-central ',shell=True)
 call('hg -R'+ mozilla_aurora +' up -C', shell=True)
 mozilla_central_rev = subprocess.check_output('hg id -R %s -i -r default' % mozilla_aurora, shell=True)
-call('hg -R %s debugsetparents %s %s' % (mozilla_aurora, mozilla_central_rev, mozilla_aurora_rev), shell=True)
-call('hg -R %s commit -m "Merging old head via |hg debugsetparents %s %s|. CLOSED TREE DONTBUILD"' % (mozilla_aurora, mozilla_central_rev, mozilla_aurora_rev), shell=True)
+call('hg -R %s debugsetparents %s %s' % (mozilla_aurora, mozilla_central_rev.rstrip(), mozilla_aurora_rev.rstrip()), shell=True)
+call('hg -R %s commit -m "Merging old head via |hg debugsetparents %s %s|. CLOSED TREE DONTBUILD"' % (mozilla_aurora, mozilla_central_rev.rstrip(), mozilla_aurora_rev.rstrip()), shell=True)
 raw_input("> version-bump mozilla-aurora (hit 'return' to proceed) <")
 
 ## version bumps
@@ -207,5 +210,5 @@ call('hg diff -R'+ mozilla_aurora , shell=True)
 raw_input("If the diff looks good hit 'return' to continue to commit..")
 call('hg -R '+mozilla_aurora +' commit -m "Merging in branding changes NO BUG CLOSED TREE ba=release"',shell=True)
 
-raw_input("Return to the wiki to do the L10n data changes ..")
+print "Return to the wiki to do the L10n data changes -- AUTOMATION COMPLETE"
 
